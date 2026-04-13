@@ -20,6 +20,10 @@ const generateToken = (user) => {
 export const signup = async (req, res) => {
   console.log("called signup")
   const { name, email, password } = req.body;
+  const user= await User.findOne({email})
+  if(user){
+    return res.status(400).json({message:"user already exist"})
+  }
   const hashedPassword = await bcrypt.hash(password, 10);
 
   await User.create({ name, email, password: hashedPassword });
