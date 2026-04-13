@@ -72,4 +72,14 @@ export const refresh = async () => {
   res.json({ accessToken });
 };
 
-
+export const logout= async()=>{
+    const token= req.cookies.refreshtoken 
+    const user= await User.findOne({refreshToken:token})
+    if(!user){
+        return res.status(400).json({message:"user not found"})
+    } 
+    user.refreshToken=null 
+    await user.save()
+    res.clearCookie("refreshToken")
+    res.json({message:"user loged out"})
+}
