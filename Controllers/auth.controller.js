@@ -42,7 +42,7 @@ export const login = async (req, res) => {
     return res.status(400).json({ message: "password not matched" });
   }
   const result = generateToken(user);
-  user.refreshToken = result.refreshToken;
+  user.refreshToken.push(result.refreshToken);
   await user.save();
 
   res.cookie("refreshToken", result.refreshToken, {
@@ -60,33 +60,54 @@ export const refresh = async (req, res) => {
     return res.status(400).json({ message: "no refresh token found" });
   }
 
-  const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+  try {
+    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+    const user = await User.findById(decoded.id);
 
-  const user = await User.findById(decoded.id);
+    if (!user || !user.refreshTokens.includes(token)) {
+      return res.status(403).json({ msg: "Invalid token" });
+    }
 
-  if (!user) {
-    return res.status(400).json({ message: "user not found" });
+    const accessToken = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.ACCESS_TOKEN_SECRET,
+      { expiresIn: "15m" },
+    );
+
+    res.json({ accessToken });
+  } catch (error) {
+    return res.status(401).json({ message: "invalid or expired refresh token" });
   }
-
-  const accessToken = jwt.sign(
-    { id: user._id, role: user.role },
-    process.env.ACCESS_TOKEN_SECRET,
-    { expiresIn: "15m" },
-  );
-
-  res.json({ accessToken });
 };
 
 export const logout = async (req, res) => {
   const token = req.cookies.refreshToken;
-  const user = await User.findOne({ refreshToken: token });
 
-  if (!user) {
-    return res.status(400).json({ message: "user not found" });
+  const user = await User.findOne({ refreshTokens: token });
+
+  if (user) {
+    user.refreshToken = user.refreshToken.filter(t => t !== token);
+    await user.save();
   }
 
-  user.refreshToken = null;
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: true
+  });
+
+  res.json({ message: "Logged out from this device" });
+};
+
+export const logoutAll = async (req, res) => {
+  const userId = req.user.id;
+
+  const user = await User.findById(userId);
+
+  user.refreshToken = []; // remove all tokens
   await user.save();
+
   res.clearCookie("refreshToken");
-  res.json({ message: "user loged out" });
+
+  res.json({ message: "Logged out from all devices" });
 };
