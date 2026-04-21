@@ -17,6 +17,18 @@ const generateToken = (user) => {
   return { accessToken, refreshToken };
 };
 
+const getActiveSessions = (refreshTokens = []) => {
+  return refreshTokens.map((token, index) => {
+    const decoded = jwt.decode(token);
+
+    return {
+      sessionNumber: index + 1,
+      issuedAt: decoded?.iat ? new Date(decoded.iat * 1000) : null,
+      expiresAt: decoded?.exp ? new Date(decoded.exp * 1000) : null,
+    };
+  });
+};
+
 export const signup = async (req, res) => {
   console.log("called signup")
   const { name, email, password } = req.body;
@@ -41,8 +53,17 @@ export const login = async (req, res) => {
   if (!isMatched) {
     return res.status(400).json({ message: "password not matched" });
   }
+
+  if (user.refreshTokens.length >= 10) {
+    return res.status(403).json({
+      message: "Device limit reached. Please logout from one device and try again.",
+      activeSessionCount: user.refreshTokens.length,
+      sessions: getActiveSessions(user.refreshTokens),
+    });
+  }
+
   const result = generateToken(user);
-  user.refreshToken.push(result.refreshToken);
+  user.refreshTokens.push(result.refreshToken);
   await user.save();
 
   res.cookie("refreshToken", result.refreshToken, {
@@ -86,7 +107,7 @@ export const logout = async (req, res) => {
   const user = await User.findOne({ refreshTokens: token });
 
   if (user) {
-    user.refreshToken = user.refreshToken.filter(t => t !== token);
+    user.refreshTokens = user.refreshTokens.filter((t) => t !== token);
     await user.save();
   }
 
@@ -104,7 +125,7 @@ export const logoutAll = async (req, res) => {
 
   const user = await User.findById(userId);
 
-  user.refreshToken = []; // remove all tokens
+  user.refreshTokens = []; // remove all tokens
   await user.save();
 
   res.clearCookie("refreshToken");
