@@ -1,19 +1,20 @@
-import mongoose from "mongoose"
+import mongoose from "mongoose";
 
-const userSchema= new mongoose.Schema({
-    name:String,
-    email:{type:String,unique:true},
-    refreshTokens: {
-        type: [String],
-        validate: {
-          validator: function (val) {
-            return val.length <= 10;
-          },
-          message: "Cannot have more than 10 logged in devices"
-        },
-      },
-    password:String,
-    role:{type:String,default:"user"}
-},{timestamps:true})
+const userSchema = new mongoose.Schema(
+  {
+    name: String,
+    email: { type: String, unique: true },
+    refreshTokens: { type: [String], default: [] },
+    password: String,
+    /** `Role` document `_id` — signup sends `1`/`2` (code); API maps to this ref. */
+    role: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Role",
+      required: true,
+    },
+    accessTokenVersion: { type: Number, default: 0 },
+  },
+  { timestamps: true },
+);
 
-export default  mongoose.model("userSchema", userSchema)
+export default mongoose.model("userSchema", userSchema);
