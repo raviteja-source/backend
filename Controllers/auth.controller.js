@@ -184,6 +184,14 @@ export const logout = async (req, res) => {
 };
 
 export const logoutAll = async (req, res) => {
+  const { userId } = req.body;
+
+  if (String(userId) !== String(req.user.id)) {
+    return res
+      .status(403)
+      .json({ message: "userId does not match authenticated user" });
+  }
+
   const user = await User.findById(req.user.id);
 
   if (!user) {
